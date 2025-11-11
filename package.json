@@ -1,0 +1,17 @@
+{
+  "name": "portal",
+  "version": "1.0.0",
+  "description": "Febesol Subunternehmer Portal Grundgerüst",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "febesol",
+    "portal",
+    "monday"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs"
+}
