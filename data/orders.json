@@ -1,0 +1,32 @@
+{
+  "boards": {
+    "1766160356": [
+      {
+        "id": "order-1001",
+        "name": "Montage Auftrag 1001",
+        "linkedItems": {
+          "ext__dc_partner_mkka8r": "item-2001"
+        },
+        "status": "offen"
+      },
+      {
+        "id": "order-1002",
+        "name": "Installation Auftrag 1002",
+        "linkedItems": {
+          "ext__ac_partner_mkkatjey": "item-2002"
+        },
+        "status": "in_bearbeitung"
+      }
+    ],
+    "1766184997": [
+      {
+        "id": "order-2001",
+        "name": "Wartung Auftrag 2001",
+        "linkedItems": {
+          "ext__ac_partner_mkkvqqbf": "item-2002"
+        },
+        "status": "geplant"
+      }
+    ]
+  }
+}
