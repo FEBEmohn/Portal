@@ -39,10 +39,10 @@ Für die Installation als Windows-Dienst mit NSSM bietet sich folgende
 Konfiguration an:
 
 ```powershell
-nssm install FebesolPortal "C:\\Program Files\\nodejs\\node.exe" "D:\\Plesk\\Vhosts\\febesol.com\\portal.febesol.com\\src\\server.js"
-nssm set FebesolPortal AppDirectory "D:\\Plesk\\Vhosts\\febesol.com\\portal.febesol.com"
-nssm set FebesolPortal AppStdout "D:\\Plesk\\Vhosts\\febesol.com\\portal.febesol.com\\portal.log"
-nssm set FebesolPortal AppStderr "D:\\Plesk\\Vhosts\\febesol.com\\portal.febesol.com\\portal.log"
+nssm install FebesolPortal "C:\\Program Files\\nodejs\\node.exe" "C:\\portal\\src\\server.js"
+nssm set FebesolPortal AppDirectory "C:\\portal"
+nssm set FebesolPortal AppStdout "C:\\portal\\portal.log"
+nssm set FebesolPortal AppStderr "C:\\portal\\portal.log"
 ```
 
 Die Umgebung kann bei Bedarf über `nssm set FebesolPortal AppEnvironmentExtra
