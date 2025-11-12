@@ -1,59 +1,75 @@
-const ADMIN_ALLOWED_IDENTIFIERS = (process.env.ADMIN_ALLOWED_IDENTIFIERS || '')
-  .split(',')
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean);
+const THIRTY_MINUTES = 30 * 60 * 1000;
 
-function isIdentifierAllowed(claims) {
-  if (ADMIN_ALLOWED_IDENTIFIERS.length === 0) {
-    console.warn(
-      'ADMIN_ALLOWED_IDENTIFIERS is empty. No Microsoft account will be granted admin access.'
-    );
+function sessionHasUser(req) {
+  return Boolean(req.session && req.session.user);
+}
+
+function normalizeList(value) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => entry.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isAdminUser(user) {
+  if (!user) {
     return false;
   }
-
-  const candidates = [claims.email, claims.preferred_username, claims.oid, claims.sub]
-    .filter(Boolean)
-    .map((value) => String(value).toLowerCase());
-
-  return candidates.some((value) => ADMIN_ALLOWED_IDENTIFIERS.includes(value));
-}
-
-function ensureSession(req) {
-  if (!req.session) {
-    throw new Error('Session middleware must be mounted before auth middleware.');
+  const allowed = normalizeList(process.env.ADMIN_USERS);
+  if (!allowed.length) {
+    return false;
   }
+  const identifiers = [user.email, user.upn, user.oid, user.sub]
+    .filter(Boolean)
+    .map((entry) => String(entry).toLowerCase());
+  return identifiers.some((value) => allowed.includes(value));
 }
 
-function requireAuthLocal(req, res, next) {
-  ensureSession(req);
-  if (req.session.authType === 'local' && req.session.user) {
+function activityGuard(req, res, next) {
+  if (!sessionHasUser(req)) {
     return next();
   }
-  return res.redirect('/');
+
+  const lastActivity = req.session.lastActivity || 0;
+  const elapsed = Date.now() - lastActivity;
+
+  if (elapsed > THIRTY_MINUTES) {
+    req.session.destroy(() => {
+      if (req.originalUrl.startsWith('/admin')) {
+        return res.redirect('/admin');
+      }
+      return res.redirect('/');
+    });
+    return;
+  }
+
+  return next();
+}
+
+function resetIdleOnAction(req) {
+  if (sessionHasUser(req)) {
+    req.session.lastActivity = Date.now();
+  }
+}
+
+function requireLocalAuth(req, res, next) {
+  if (!sessionHasUser(req) || req.session.authType !== 'local') {
+    return res.redirect('/');
+  }
+  return activityGuard(req, res, next);
 }
 
 function requireAdmin(req, res, next) {
-  ensureSession(req);
-  if (req.session.authType === 'microsoft' && req.session.user?.isAdmin) {
-    return next();
+  if (!sessionHasUser(req) || req.session.authType !== 'oidc' || !isAdminUser(req.session.user)) {
+    return res.redirect('/admin');
   }
-  return res.redirect('/admin');
-}
-
-function resetIdleOnAction(req, res, next) {
-  if (req.session) {
-    res.locals.session = req.session;
-    const isAction = req.method === 'POST' || req.path === '/session/ping';
-    if (isAction) {
-      req.session.touch();
-    }
-  }
-  next();
+  return activityGuard(req, res, next);
 }
 
 module.exports = {
-  isIdentifierAllowed,
-  requireAdmin,
-  requireAuthLocal,
+  activityGuard,
   resetIdleOnAction,
+  requireLocalAuth,
+  requireAdmin,
+  isAdminUser,
 };

@@ -1,6 +1,8 @@
 const express = require('express');
-const { requireAuthLocal } = require('../middleware/auth');
-const { verifyUserCredentials } = require('../services/users');
+const argon2 = require('argon2');
+
+const { requireLocalAuth } = require('../middleware/auth');
+const users = require('../services/users');
 
 const router = express.Router();
 
@@ -9,45 +11,56 @@ router.get('/', (req, res) => {
     return res.redirect('/dashboard');
   }
 
-  res.render('local-login', {
+  return res.render('local-login', {
     title: 'Partner-Login',
-    error: req.query.error,
+    error: null,
   });
 });
 
 router.post('/login', async (req, res, next) => {
   try {
-    const identifier = (req.body.identifier || req.body.email || '').trim().toLowerCase();
-    const password = req.body.password;
-
-    if (!identifier || !password) {
-      return res.redirect('/?error=missing');
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).render('local-login', {
+        title: 'Partner-Login',
+        error: 'Bitte Zugangsdaten eingeben.',
+      });
     }
 
-    const user = await verifyUserCredentials(identifier, password);
-
+    const user = await users.findByEmail(email);
     if (!user) {
-      return res.redirect('/?error=invalid');
+      return res.status(401).render('local-login', {
+        title: 'Partner-Login',
+        error: 'Ungültige Zugangsdaten.',
+      });
     }
 
-    req.session.regenerate((regenerateError) => {
-      if (regenerateError) {
-        return next(regenerateError);
+    const passwordOk = await argon2.verify(user.passwordHash, password);
+    if (!passwordOk) {
+      return res.status(401).render('local-login', {
+        title: 'Partner-Login',
+        error: 'Ungültige Zugangsdaten.',
+      });
+    }
+
+    req.session.regenerate((error) => {
+      if (error) {
+        return next(error);
       }
 
-      req.session.authType = 'local';
       req.session.user = {
         id: user.id,
         email: user.email,
-        displayName: user.displayName,
-        role: user.role,
+        name: user.name,
       };
+      req.session.authType = 'local';
+      req.session.lastActivity = Date.now();
+      req.session.cookie.maxAge = 30 * 60 * 1000;
 
       req.session.save((saveError) => {
         if (saveError) {
           return next(saveError);
         }
-
         res.redirect('/dashboard');
       });
     });
@@ -56,7 +69,7 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-router.get('/dashboard', requireAuthLocal, (req, res) => {
+router.get('/dashboard', requireLocalAuth, (req, res) => {
   res.render('dashboard', {
     title: 'Partner-Dashboard',
     user: req.session.user,
@@ -64,11 +77,10 @@ router.get('/dashboard', requireAuthLocal, (req, res) => {
 });
 
 router.post('/logout', (req, res, next) => {
-  req.session.destroy((destroyError) => {
-    if (destroyError) {
-      return next(destroyError);
+  req.session.destroy((error) => {
+    if (error) {
+      return next(error);
     }
-
     res.clearCookie('portal.sid');
     res.redirect('/');
   });

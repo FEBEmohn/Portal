@@ -1,13 +1,14 @@
-# Febesol Portal
+# Portal
 
-Das Projekt stellt einen Express-basierten Server bereit, der zwei getrennte
+Das Projekt stellt einen Express-Server bereit, der zwei getrennte
 Authentifizierungswege kombiniert:
 
-- **Microsoft OIDC Login** für Administratoren unter `/admin`.
-- **Lokale Benutzerkonten** für Partner unter `/` inkl. Dashboard.
+- **Microsoft OIDC Login** für Administrator:innen unter `/admin`.
+- **Lokaler Login** (E-Mail & Passwort) für Partner:innen unter `/`.
 
-Sitzungen laufen jeweils 30 Minuten und werden ausschließlich durch aktive
-Button-Interaktionen verlängert.
+Eine Sitzung entsteht erst nach einem erfolgreichen Login. Anschließend gilt
+ein Idle-Timeout von 30 Minuten, das ausschließlich durch POST-Interaktionen
+(z. B. Formulare oder `POST /session/ping`) zurückgesetzt wird.
 
 ## Voraussetzungen & Installation
 
@@ -31,74 +32,51 @@ Button-Interaktionen verlängert.
 ## Microsoft OIDC für den Adminbereich
 
 1. In Azure Entra ID eine **Web App** registrieren.
-2. Folgende Redirect-URI hinterlegen (ggf. an Umgebung anpassen):
-   `https://<host>/auth/microsoft/callback`.
-3. **Client-ID**, **Client-Secret**, **Tenant-ID** und Redirect-URI in die `.env`
-   eintragen (`MICROSOFT_*`).
-4. Mit `ADMIN_ALLOWED_IDENTIFIERS` steuern, welche Konten Zugriff erhalten. Die
-   Liste akzeptiert E-Mail-Adressen, `preferred_username`, Objekt-IDs (`oid`) oder
-   `sub`-Werte – Komma-separiert.
+2. Den Issuer (z. B. `https://login.microsoftonline.com/<tenant>/v2.0`)
+   und die Redirect-URI `https://<host>/auth/microsoft/callback` notieren.
+3. Die `.env` mit `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` und
+   `OIDC_REDIRECT_URI` befüllen.
+4. Über `ADMIN_USERS` (Komma-separiert) steuern, welche Microsoft-Accounts Zugriff
+   erhalten – zugelassen sind E-Mails, `preferred_username`, `oid` oder `sub`.
 
-Nach erfolgreichem Login wird in der Session vermerkt, dass es sich um einen
-verifizierten Admin handelt. Auf nicht autorisierte Konten reagiert `/admin`
-mit einem Hinweis statt 404/403.
+Nicht berechtigte Accounts landen wieder auf `/admin`, ohne dass eine 404/403
+ausgegeben wird.
 
-## Lokale Benutzerverwaltung
+## Lokaler Login
 
-- Lokale Konten werden im Adminbereich verwaltet. Es steht ein Formular zum
-  Anlegen/Ändern von Benutzern und eine Liste zum Löschen vorhandener Konten zur
-  Verfügung.
-- Die Daten landen in `data/accounts.json`. Passwörter werden mit `argon2`
-  gehasht; weder Klartext noch Argon2-Parameter müssen manuell gepflegt werden.
-- Lokale Nutzer melden sich auf `/` an und gelangen anschließend zum geschützten
-  `/dashboard`.
+- Lokale Accounts werden in `data/users.json` hinterlegt. Passwörter sind mit
+  `argon2` gehasht.
+- Unauthentifizierte Aufrufe von `/` liefern immer das Login-Formular.
+- Nach erfolgreichem Login gelangen Partner:innen auf das Dashboard (`/dashboard`).
 
-## Sessions & Idle-Reset
+## Sessions & Idle-Timeout
 
-- `express-session` nutzt einen 30-Minuten-Cookie (`maxAge = 30 * 60 * 1000`).
-- In Produktion werden `cookie.secure = true`, `sameSite = 'lax'` und
-  `httpOnly = true` gesetzt; zusätzlich aktiviert der Server `app.set('trust proxy', 1)`.
-- Die Middleware `resetIdleOnAction` ruft `req.session.touch()` **nur** bei
-  `POST`-Requests sowie beim Endpoint `POST /session/ping` auf. Dadurch verlängert
-  sich die Session ausschließlich bei tatsächlichen Interaktionen.
-- Formulare und Buttons lösen daher entweder einen `POST` aus (z. B. Login,
-  Logout, Benutzerverwaltung) oder schicken per JS `fetch('/session/ping', { method: 'POST' })`.
+- `express-session` arbeitet mit `saveUninitialized: false`, es entsteht also
+  keine Session, bevor ein Login erfolgreich war.
+- Nach dem Login wird `cookie.maxAge` auf `30 * 60 * 1000` gesetzt (`rolling: false`).
+- Der Idle-Timer (`req.session.lastActivity`) wird nur bei `POST`-Interaktionen
+  oder `POST /session/ping` aktualisiert. Reine GET-Aufrufe verlängern die Session
+  nicht.
+- `helmet`, `cookie-parser` und `app.set('trust proxy', 1)` sind standardmäßig aktiv.
 
 ## Umgebungsvariablen
 
-Siehe [`.env.example`](./.env.example) für eine vollständige Liste. Wichtige
-Variablen im Überblick:
+| Variable            | Beschreibung                               |
+| ------------------- | ------------------------------------------ |
+| `PORT`, `HOST`      | Adresse des HTTP-Servers                    |
+| `SESSION_SECRET`    | Secret zur Signierung der Session-Cookies   |
+| `OIDC_ISSUER`       | OIDC-Issuer (z. B. Microsoft)               |
+| `OIDC_CLIENT_ID`    | Client-ID der App-Registrierung             |
+| `OIDC_CLIENT_SECRET`| Client-Secret der App-Registrierung         |
+| `OIDC_REDIRECT_URI` | Redirect-URI für den OIDC-Flow              |
+| `ADMIN_USERS`       | Komma-separierte Liste erlaubter Admins     |
 
-| Variable                     | Beschreibung                                       |
-| ---------------------------- | -------------------------------------------------- |
-| `PORT`, `HOST`               | Adresse des HTTP-Servers                           |
-| `SESSION_SECRET`             | Secret zur Signierung der Session-Cookies          |
-| `MICROSOFT_TENANT_ID`        | Azure Entra ID Tenant                              |
-| `MICROSOFT_CLIENT_ID`        | App-Registrierung Client-ID                        |
-| `MICROSOFT_CLIENT_SECRET`    | App-Registrierung Secret                           |
-| `MICROSOFT_REDIRECT_URI`     | Redirect-URI der App                               |
-| `ADMIN_ALLOWED_IDENTIFIERS`  | Komma-separierte Liste erlaubter Admin-Konten      |
-
-## Troubleshooting
-
-- **403/Redirect-Schleifen**: Sicherstellen, dass
-  `ADMIN_ALLOWED_IDENTIFIERS` den Microsoft-Account enthält bzw. dass lokale
-  Nutzer ein Konto besitzen.
-- **404 auf `/admin`**: Die Route existiert immer; ein fehlender Login zeigt den
-  Microsoft-Button. Prüfen Sie, ob das Frontend versehentlich eine andere Route
-  ansteuert.
-- **Session/Cookie-Probleme hinter Nginx**: In produktiven Setups `trust proxy`
-  aktiv lassen und sicherstellen, dass der Proxy `X-Forwarded-Proto` setzt.
-- **OIDC-Fehler nach Login**: Redirect-URI exakt mit Azure-Konfiguration
-  abgleichen (einschließlich Protokoll) und bei Bedarf neue Secrets generieren.
-
-## Kurz-Testplan
+## Checks
 
 1. `GET /healthz` → `ok`.
-2. `GET /admin` (ohne Session) → Seite mit Button „Login mit Microsoft“.
-3. Button klicken → OIDC-Flow → nach Erfolg `/admin` erreichbar (Admin-Benutzer).
-4. `GET /` → lokale Login-Seite; `POST /login` prüft Argon2-Credentials.
-5. Nach lokalem Login → `/dashboard` erreichbar.
-6. >30 Minuten ohne Interaktion warten → Session erlischt, erneuter Login nötig.
-7. Buttons/Formulare klicken → Session verlängert sich (über `POST` oder
-   `POST /session/ping`).
+2. `GET /admin` ohne Session → Login-Seite mit „Login mit Microsoft“.
+3. Erfolgreicher Microsoft-Login → Admin-Dashboard erreichbar, weitere Unterseiten
+   wie `/admin/users` verlangen eine Admin-Session.
+4. `GET /` → lokales Loginformular, kein 403.
+5. Lokaler Login → `/dashboard` erreichbar, Logout zerstört die Session.
+6. Nach >30 Minuten ohne Interaktion → Session ungültig, erneuter Login erforderlich.
