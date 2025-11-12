@@ -1,4 +1,4 @@
-const express = require('../lib/mini-express');
+const express = require('express');
 const { Issuer, generators } = require('openid-client');
 const { isIdentifierAllowed } = require('../middleware/auth');
 

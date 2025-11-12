@@ -1,4 +1,4 @@
-const express = require('../lib/mini-express');
+const express = require('express');
 const { requireAuthLocal } = require('../middleware/auth');
 const { verifyUserCredentials } = require('../services/users');
 

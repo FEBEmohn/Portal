@@ -1,7 +1,7 @@
 # Febesol Portal
 
-Das Projekt stellt einen leichtgewichtigen, Express-kompatiblen Server bereit,
-der zwei getrennte Authentifizierungswege kombiniert:
+Das Projekt stellt einen Express-basierten Server bereit, der zwei getrennte
+Authentifizierungswege kombiniert:
 
 - **Microsoft OIDC Login** für Administratoren unter `/admin`.
 - **Lokale Benutzerkonten** für Partner unter `/` inkl. Dashboard.
@@ -13,8 +13,7 @@ Button-Interaktionen verlängert.
 
 1. Node.js ≥ 18 installieren.
 2. Repository klonen und in das Projektverzeichnis wechseln.
-3. Optional: Die wenigen externen Abhängigkeiten (`argon2`, `openid-client`)
-   installieren, falls sie in der Zielumgebung nicht bereits vorhanden sind:
+3. Abhängigkeiten installieren:
 
    ```bash
    npm install
@@ -56,10 +55,9 @@ mit einem Hinweis statt 404/403.
 
 ## Sessions & Idle-Reset
 
-- Eine eingebaute Session-Implementierung nutzt einen 30-Minuten-Cookie
-  (`maxAge = 30 * 60 * 1000`).
+- `express-session` nutzt einen 30-Minuten-Cookie (`maxAge = 30 * 60 * 1000`).
 - In Produktion werden `cookie.secure = true`, `sameSite = 'lax'` und
-  `httpOnly = true` gesetzt.
+  `httpOnly = true` gesetzt; zusätzlich aktiviert der Server `app.set('trust proxy', 1)`.
 - Die Middleware `resetIdleOnAction` ruft `req.session.touch()` **nur** bei
   `POST`-Requests sowie beim Endpoint `POST /session/ping` auf. Dadurch verlängert
   sich die Session ausschließlich bei tatsächlichen Interaktionen.
@@ -89,8 +87,8 @@ Variablen im Überblick:
 - **404 auf `/admin`**: Die Route existiert immer; ein fehlender Login zeigt den
   Microsoft-Button. Prüfen Sie, ob das Frontend versehentlich eine andere Route
   ansteuert.
-- **Session/Cookie-Probleme hinter Nginx**: Sicherstellen, dass TLS-Termination
-  den Client weiterhin als HTTPS identifiziert und `cookie.secure` nicht blockiert.
+- **Session/Cookie-Probleme hinter Nginx**: In produktiven Setups `trust proxy`
+  aktiv lassen und sicherstellen, dass der Proxy `X-Forwarded-Proto` setzt.
 - **OIDC-Fehler nach Login**: Redirect-URI exakt mit Azure-Konfiguration
   abgleichen (einschließlich Protokoll) und bei Bedarf neue Secrets generieren.
 

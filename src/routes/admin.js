@@ -1,4 +1,4 @@
-const express = require('../lib/mini-express');
+const express = require('express');
 const { requireAdmin } = require('../middleware/auth');
 const { listUsers, upsertUser, removeUser } = require('../services/users');
 

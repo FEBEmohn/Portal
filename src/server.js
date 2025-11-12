@@ -1,8 +1,8 @@
 const path = require('path');
-const express = require('./lib/mini-express');
-const session = require('./lib/mini-session');
-const helmet = require('./lib/mini-helmet');
-const cookieParser = require('./lib/mini-cookie-parser');
+const express = require('express');
+const session = require('express-session');
+const helmet = require('helmet');
+const cookieParser = require('cookie-parser');
 
 const { resetIdleOnAction } = require('./middleware/auth');
 const authRouter = require('./routes/auth');
@@ -28,6 +28,10 @@ app.get('/healthz', (req, res) => {
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
+
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
 
 const sessionSecret = process.env.SESSION_SECRET;
 if (!sessionSecret) {
