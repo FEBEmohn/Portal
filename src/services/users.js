@@ -1,209 +1,76 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const argon2 = require('argon2');
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const ACCOUNTS_FILE = path.join(DATA_DIR, 'accounts.json');
+const DB_FILE = path.join(__dirname, '..', '..', 'data', 'users.json');
 
 function ensureStore() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
+  const dir = path.dirname(DB_FILE);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
   }
-
-  if (!fs.existsSync(ACCOUNTS_FILE)) {
-    fs.writeFileSync(ACCOUNTS_FILE, JSON.stringify({ accounts: [] }, null, 2));
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify({ users: [] }, null, 2));
   }
 }
 
-function loadAccounts() {
+async function readStore() {
   ensureStore();
-  const raw = JSON.parse(fs.readFileSync(ACCOUNTS_FILE, 'utf-8'));
-  const accounts = Array.isArray(raw.accounts) ? raw.accounts : [];
-  let mutated = false;
-
-  const normalized = accounts.map((account) => {
-    const updated = { ...account };
-
-    if (!updated.id) {
-      updated.id = crypto.randomUUID();
-      mutated = true;
-    }
-
-    if (updated.email) {
-      const lower = String(updated.email).toLowerCase();
-      if (lower !== updated.email) {
-        updated.email = lower;
-        mutated = true;
-      }
-    }
-
-    if (updated.username) {
-      const lower = String(updated.username).toLowerCase();
-      if (lower !== updated.username) {
-        updated.username = lower;
-        mutated = true;
-      }
-    }
-
-    if (!updated.displayName) {
-      updated.displayName = '';
-    }
-
-    if (!updated.role) {
-      updated.role = 'user';
-      mutated = true;
-    }
-
-    if (!updated.createdAt) {
-      updated.createdAt = new Date().toISOString();
-      mutated = true;
-    }
-
-    if (!updated.updatedAt) {
-      updated.updatedAt = updated.createdAt;
-      mutated = true;
-    }
-
-    if (!updated.passwordHash) {
-      updated.passwordHash = null;
-    }
-
-    return updated;
-  });
-
-  if (mutated) {
-    persistAccounts(normalized);
+  const raw = await fs.promises.readFile(DB_FILE, 'utf-8');
+  const data = JSON.parse(raw);
+  if (!Array.isArray(data.users)) {
+    data.users = [];
   }
-
-  return normalized;
+  return data;
 }
 
-function persistAccounts(accounts) {
-  ensureStore();
-  fs.writeFileSync(
-    ACCOUNTS_FILE,
-    JSON.stringify(
-      {
-        accounts,
-      },
-      null,
-      2
-    )
+async function writeStore(data) {
+  await fs.promises.writeFile(DB_FILE, JSON.stringify(data, null, 2));
+}
+
+async function all() {
+  const data = await readStore();
+  return data.users;
+}
+
+async function findByEmail(email) {
+  if (!email) {
+    return null;
+  }
+  const data = await readStore();
+  const needle = String(email).trim().toLowerCase();
+  return (
+    data.users.find((user) => user.email && user.email.toLowerCase() === needle) || null
   );
 }
 
-function toPublicUser(account) {
-  return {
-    id: account.id,
-    email: account.email,
-    username: account.username,
-    displayName: account.displayName,
-    role: account.role,
-    createdAt: account.createdAt,
-    updatedAt: account.updatedAt,
+async function addOrUpdate(user) {
+  const data = await readStore();
+  const id = user.id || crypto.randomUUID();
+  const normalizedEmail = user.email ? String(user.email).trim().toLowerCase() : null;
+  const existingIndex = data.users.findIndex(
+    (entry) => entry.id === id || (normalizedEmail && entry.email === normalizedEmail)
+  );
+
+  const record = {
+    id,
+    email: normalizedEmail,
+    name: user.name || '',
+    passwordHash: user.passwordHash,
   };
-}
 
-function listUsers() {
-  return loadAccounts().map(toPublicUser);
-}
-
-async function upsertUser({ id, email, username, displayName, role, password }) {
-  const normalizedEmail = email ? String(email).trim().toLowerCase() : undefined;
-  const normalizedUsername = username ? String(username).trim().toLowerCase() : undefined;
-
-  if (!normalizedEmail && !normalizedUsername) {
-    throw new Error('Ein Benutzer benötigt mindestens eine E-Mail-Adresse oder einen Benutzernamen.');
-  }
-
-  if (!password && !id) {
-    throw new Error('Für neue Benutzer muss ein Passwort gesetzt werden.');
-  }
-
-  const accounts = loadAccounts();
-  const timestamp = new Date().toISOString();
-
-  let account = id ? accounts.find((entry) => entry.id === id) : undefined;
-
-  if (!account && normalizedEmail) {
-    account = accounts.find((entry) => entry.email === normalizedEmail);
-  }
-
-  if (!account && normalizedUsername) {
-    account = accounts.find((entry) => entry.username === normalizedUsername);
-  }
-
-  if (!account) {
-    account = {
-      id: crypto.randomUUID(),
-      email: normalizedEmail,
-      username: normalizedUsername,
-      displayName: displayName || '',
-      role: role || 'user',
-      passwordHash: null,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    accounts.push(account);
+  if (existingIndex >= 0) {
+    data.users.splice(existingIndex, 1, { ...data.users[existingIndex], ...record });
   } else {
-    account.email = normalizedEmail || account.email;
-    account.username = normalizedUsername || account.username;
-    account.displayName = displayName ?? account.displayName;
-    account.role = role || account.role;
-    account.updatedAt = timestamp;
+    data.users.push(record);
   }
 
-  if (password) {
-    account.passwordHash = await argon2.hash(password);
-    account.updatedAt = timestamp;
-  }
-
-  persistAccounts(accounts);
-
-  return toPublicUser(account);
-}
-
-function removeUser(id) {
-  const accounts = loadAccounts();
-  const index = accounts.findIndex((entry) => entry.id === id);
-
-  if (index === -1) {
-    return false;
-  }
-
-  accounts.splice(index, 1);
-  persistAccounts(accounts);
-  return true;
-}
-
-async function verifyUserCredentials(identifier, password) {
-  const normalizedIdentifier = String(identifier || '').trim().toLowerCase();
-  if (!normalizedIdentifier || !password) {
-    return null;
-  }
-
-  const accounts = loadAccounts();
-  const account = accounts.find(
-    (entry) => entry.email === normalizedIdentifier || entry.username === normalizedIdentifier
-  );
-
-  if (!account || !account.passwordHash) {
-    return null;
-  }
-
-  const passwordMatches = await argon2.verify(account.passwordHash, password);
-
-  if (!passwordMatches) {
-    return null;
-  }
-
-  return toPublicUser(account);
+  await writeStore(data);
+  return record;
 }
 
 module.exports = {
-  listUsers,
-  removeUser,
-  upsertUser,
-  verifyUserCredentials,
+  all,
+  findByEmail,
+  addOrUpdate,
 };

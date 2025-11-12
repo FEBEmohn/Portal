@@ -1,24 +1,23 @@
 const express = require('express');
-const { Issuer, generators } = require('openid-client');
-const { isIdentifierAllowed } = require('../middleware/auth');
+const { Issuer } = require('openid-client');
+
+const { isAdminUser } = require('../middleware/auth');
 
 const router = express.Router();
 
-const tenantId = process.env.MICROSOFT_TENANT_ID;
-const clientId = process.env.MICROSOFT_CLIENT_ID;
-const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
-const redirectUri = process.env.MICROSOFT_REDIRECT_URI;
-
 let clientPromise;
-
 async function getClient() {
-  if (!tenantId || !clientId || !clientSecret || !redirectUri) {
-    throw new Error('Microsoft OIDC environment variables are not fully configured.');
-  }
-
   if (!clientPromise) {
-    const authority = `https://login.microsoftonline.com/${tenantId}/v2.0`;
-    clientPromise = Issuer.discover(`${authority}/.well-known/openid-configuration`).then(
+    const issuerUrl = process.env.OIDC_ISSUER;
+    const clientId = process.env.OIDC_CLIENT_ID;
+    const clientSecret = process.env.OIDC_CLIENT_SECRET;
+    const redirectUri = process.env.OIDC_REDIRECT_URI;
+
+    if (!issuerUrl || !clientId || !clientSecret || !redirectUri) {
+      throw new Error('OIDC configuration is incomplete.');
+    }
+
+    clientPromise = Issuer.discover(issuerUrl).then(
       (issuer) =>
         new issuer.Client({
           client_id: clientId,
@@ -28,25 +27,15 @@ async function getClient() {
         })
     );
   }
-
   return clientPromise;
 }
 
 router.get('/microsoft', async (req, res, next) => {
   try {
     const client = await getClient();
-    const state = generators.state();
-    const nonce = generators.nonce();
-
-    req.session.oidc = { state, nonce };
-
     const authorizationUrl = client.authorizationUrl({
       scope: 'openid profile email',
-      state,
-      nonce,
-      response_mode: 'query',
     });
-
     res.redirect(authorizationUrl);
   } catch (error) {
     next(error);
@@ -57,41 +46,34 @@ router.get('/microsoft/callback', async (req, res, next) => {
   try {
     const client = await getClient();
     const params = client.callbackParams(req);
-    const stored = req.session.oidc;
-
-    if (!stored || params.state !== stored.state) {
-      return res.redirect('/admin?error=invalid_state');
-    }
-
-    const tokenSet = await client.callback(redirectUri, params, {
-      state: stored.state,
-      nonce: stored.nonce,
-    });
-
+    const redirectUri = process.env.OIDC_REDIRECT_URI;
+    const tokenSet = await client.callback(redirectUri, params, {});
     const claims = tokenSet.claims();
 
-    if (!isIdentifierAllowed(claims)) {
-      return res.redirect('/admin?error=unauthorized');
+    if (!isAdminUser(claims)) {
+      return res.redirect('/admin');
     }
 
-    req.session.regenerate((regenerateError) => {
-      if (regenerateError) {
-        return next(regenerateError);
+    req.session.regenerate((error) => {
+      if (error) {
+        return next(error);
       }
 
-      req.session.authType = 'microsoft';
       req.session.user = {
-        name: claims.name || claims.preferred_username || claims.email,
+        sub: claims.sub,
         email: claims.email || claims.preferred_username,
+        name: claims.name,
+        upn: claims.preferred_username,
         oid: claims.oid,
-        isAdmin: true,
       };
+      req.session.authType = 'oidc';
+      req.session.lastActivity = Date.now();
+      req.session.cookie.maxAge = 30 * 60 * 1000;
 
       req.session.save((saveError) => {
         if (saveError) {
           return next(saveError);
         }
-
         res.redirect('/admin');
       });
     });
@@ -101,13 +83,11 @@ router.get('/microsoft/callback', async (req, res, next) => {
 });
 
 router.post('/logout', (req, res, next) => {
-  const redirectTarget = req.session?.authType === 'microsoft' ? '/admin' : '/';
-
-  req.session.destroy((destroyError) => {
-    if (destroyError) {
-      return next(destroyError);
+  const redirectTarget = req.session?.authType === 'oidc' ? '/admin' : '/';
+  req.session.destroy((error) => {
+    if (error) {
+      return next(error);
     }
-
     res.clearCookie('portal.sid');
     res.redirect(redirectTarget);
   });

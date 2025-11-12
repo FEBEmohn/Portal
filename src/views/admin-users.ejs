@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background: #f9fafb;
+        margin: 0;
+        padding: 2rem;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #ffffff;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      }
+      th,
+      td {
+        padding: 1rem;
+        border-bottom: 1px solid #e5e7eb;
+        text-align: left;
+      }
+      th {
+        background: #f1f5f9;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      a {
+        color: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Benutzerübersicht</h1>
+    <p>Angemeldet als <strong><%= (user && (user.name || user.email)) || 'Admin' %></strong>.</p>
+    <% if (!users.length) { %>
+    <p>Noch keine lokalen Nutzer angelegt.</p>
+    <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>E-Mail</th>
+          <th>Name</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% users.forEach(function (entry) { %>
+        <tr>
+          <td><%= entry.email %></td>
+          <td><%= entry.name || '–' %></td>
+        </tr>
+        <% }); %>
+      </tbody>
+    </table>
+    <% } %>
+    <p><a href="/admin">Zurück zum Dashboard</a></p>
+  </body>
+</html>
