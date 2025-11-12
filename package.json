@@ -16,6 +16,7 @@
   "type": "commonjs",
   "dependencies": {
     "argon2": "^0.30.3",
+    "ejs": "^3.1.9",
     "openid-client": "^5.6.2"
   }
 }
