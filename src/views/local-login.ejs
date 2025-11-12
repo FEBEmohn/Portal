@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title><%= title %></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #eef2ff, #e0f2fe);
+        margin: 0;
+        padding: 0;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+      }
+      main {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 2.5rem;
+        width: min(420px, 100%);
+        box-shadow: 0 15px 45px rgba(15, 23, 42, 0.15);
+      }
+      h1 {
+        margin: 0 0 1.5rem;
+        font-size: 1.75rem;
+        color: #1f2937;
+      }
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #374151;
+      }
+      input {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        border: 1px solid #d1d5db;
+        font-size: 1rem;
+        margin-bottom: 1.25rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      input:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.15);
+      }
+      button {
+        background: #2563eb;
+        color: #ffffff;
+        border: none;
+        width: 100%;
+        padding: 0.85rem;
+        font-size: 1.05rem;
+        font-weight: 600;
+        border-radius: 999px;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2);
+      }
+      .error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+        padding: 0.75rem 1rem;
+        border-radius: 10px;
+        margin-bottom: 1.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Partner-Login</h1>
+      <% if (error === 'invalid') { %>
+      <div class="error">Die Zugangsdaten sind ungültig.</div>
+      <% } else if (error === 'missing') { %>
+      <div class="error">Bitte geben Sie E-Mail/Benutzername und Passwort ein.</div>
+      <% } %>
+      <form method="post" action="/login">
+        <label for="identifier">E-Mail oder Benutzername</label>
+        <input id="identifier" name="identifier" type="text" autocomplete="username" required />
+
+        <label for="password">Passwort</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+        <button type="submit">Anmelden</button>
+      </form>
+    </main>
+    <script>
+      document.addEventListener('click', (event) => {
+        if (event.target.closest('button')) {
+          fetch('/session/ping', { method: 'POST', credentials: 'include' }).catch(() => {});
+        }
+      });
+    </script>
+  </body>
+</html>

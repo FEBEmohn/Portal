@@ -1,115 +1,104 @@
-# Febesol Subunternehmer Portal
+# Febesol Portal
 
-Dieses Repository enthält ein leichtgewichtiges Grundgerüst für das geplante
-Portal unter `portal.febesol.com`. Die Anwendung ist in Node.js umgesetzt und
-liefert die grundlegende Struktur für folgende Bereiche:
+Das Projekt stellt einen Express-basierten Server bereit, der zwei getrennte
+Authentifizierungswege kombiniert:
 
-- **Microsoft Login für Admins** – via Azure Entra ID (OpenID Connect) mit
-  Domain-Whitelist für `@febesol.de`.
-- **Adminbereich** unter `/admin` – nach erfolgreicher Anmeldung können hier
-  Subunternehmer-Konten verwaltet und mit Items aus dem Board `4246150011`
-  verknüpft werden.
-- **Standard-Portal** unter `/` – ermöglicht die Anmeldung per lokalem Konto
-  und zeigt die Aufträge aus den Boards `1766160356` und `1766184997`, sofern
-  sie mit dem jeweiligen Item aus dem Subunternehmer-Board verknüpft sind.
+- **Microsoft OIDC Login** für Administratoren unter `/admin`.
+- **Lokale Benutzerkonten** für Partner unter `/` inkl. Dashboard.
 
-## Entwicklungs-Setup
+Sitzungen laufen jeweils 30 Minuten und werden ausschließlich durch aktive
+Button-Interaktionen verlängert.
+
+## Voraussetzungen & Installation
 
 1. Node.js ≥ 18 installieren.
-2. Repository klonen und ins Projektverzeichnis wechseln.
+2. Repository klonen und in das Projektverzeichnis wechseln.
 3. Abhängigkeiten installieren:
 
    ```bash
    npm install
    ```
 
-4. `.env` anhand der Vorlage `.env.example` anlegen.
+4. Eine `.env` auf Basis von [`.env.example`](./.env.example) anlegen.
 5. Server starten:
 
    ```bash
    node src/server.js
    ```
 
-   Der Server lauscht standardmäßig auf `0.0.0.0:3004` und protokolliert den
-   Start in der Konsole.
+   Standardmäßig lauscht der Server auf `0.0.0.0:3004`.
 
-6. Die Anwendung im Browser öffnen:
+## Microsoft OIDC für den Adminbereich
 
-   - Standard-Portal: <http://localhost:3004>
-   - Adminbereich: <http://localhost:3004/admin>
+1. In Azure Entra ID eine **Web App** registrieren.
+2. Folgende Redirect-URI hinterlegen (ggf. an Umgebung anpassen):
+   `https://<host>/auth/microsoft/callback`.
+3. **Client-ID**, **Client-Secret**, **Tenant-ID** und Redirect-URI in die `.env`
+   eintragen (`MICROSOFT_*`).
+4. Mit `ADMIN_ALLOWED_IDENTIFIERS` steuern, welche Konten Zugriff erhalten. Die
+   Liste akzeptiert E-Mail-Adressen, `preferred_username`, Objekt-IDs (`oid`) oder
+   `sub`-Werte – Komma-separiert.
 
-## Azure Entra ID (Microsoft Login)
+Nach erfolgreichem Login wird in der Session vermerkt, dass es sich um einen
+verifizierten Admin handelt. Auf nicht autorisierte Konten reagiert `/admin`
+mit einem Hinweis statt 404/403.
 
-Für den Admin-Login muss eine App-Registrierung in Azure Entra ID angelegt
-werden:
+## Lokale Benutzerverwaltung
 
-1. Neue App in Azure Portal registrieren (Single-Page oder Web App).
-2. In der App-Registrierung folgende Redirect-URI hinzufügen (falls Produktion
-   abweicht entsprechend anpassen):
-   `https://portal.febesol.com/auth/microsoft/callback`
-3. Client-Secret erzeugen und zusammen mit Tenant-ID, Client-ID und Redirect-URI
-   in `.env` hinterlegen.
+- Lokale Konten werden im Adminbereich verwaltet. Es steht ein Formular zum
+  Anlegen/Ändern von Benutzern und eine Liste zum Löschen vorhandener Konten zur
+  Verfügung.
+- Die Daten landen in `data/accounts.json`. Passwörter werden mit `argon2`
+  gehasht; weder Klartext noch Argon2-Parameter müssen manuell gepflegt werden.
+- Lokale Nutzer melden sich auf `/` an und gelangen anschließend zum geschützten
+  `/dashboard`.
 
-Nur Benutzer mit `@febesol.de`-Adresse erhalten Zugriff auf den Adminbereich.
+## Sessions & Idle-Reset
 
-## Monday.com API
-
-Für die Auftragsanzeige ist ein Monday.com GraphQL Token erforderlich. Das
-Token wird als Bearer-Token im Header gesetzt und in `.env` abgelegt. Die
-Boards und Spalten sind aktuell fest verdrahtet:
-
-- Subunternehmer-Board: `4246150011`
-- Auftrags-Boards: `1766160356`, `1766184997`
-- Link-Spalten siehe Quellcode (werden zur Filterung verwendet)
-
-Die Antwort enthält Platzhalter für Status, Fälligkeitsdatum und Notizen. Diese
-Spalten können in Zukunft ergänzt werden (siehe TODO-Kommentar im Code).
+- `express-session` nutzt einen 30-Minuten-Cookie (`maxAge = 30 * 60 * 1000`).
+- In Produktion werden `cookie.secure = true`, `sameSite = 'lax'` und
+  `httpOnly = true` gesetzt; zusätzlich aktiviert der Server `app.set('trust proxy', 1)`.
+- Die Middleware `resetIdleOnAction` ruft `req.session.touch()` **nur** bei
+  `POST`-Requests sowie beim Endpoint `POST /session/ping` auf. Dadurch verlängert
+  sich die Session ausschließlich bei tatsächlichen Interaktionen.
+- Formulare und Buttons lösen daher entweder einen `POST` aus (z. B. Login,
+  Logout, Benutzerverwaltung) oder schicken per JS `fetch('/session/ping', { method: 'POST' })`.
 
 ## Umgebungsvariablen
 
-Eine Beispielkonfiguration befindet sich in `.env.example`:
+Siehe [`.env.example`](./.env.example) für eine vollständige Liste. Wichtige
+Variablen im Überblick:
 
-```env
-PORT=3004
-HOST=0.0.0.0
-NODE_ENV=development
-COOKIE_SECRET=change-me
+| Variable                     | Beschreibung                                       |
+| ---------------------------- | -------------------------------------------------- |
+| `PORT`, `HOST`               | Adresse des HTTP-Servers                           |
+| `SESSION_SECRET`             | Secret zur Signierung der Session-Cookies          |
+| `MICROSOFT_TENANT_ID`        | Azure Entra ID Tenant                              |
+| `MICROSOFT_CLIENT_ID`        | App-Registrierung Client-ID                        |
+| `MICROSOFT_CLIENT_SECRET`    | App-Registrierung Secret                           |
+| `MICROSOFT_REDIRECT_URI`     | Redirect-URI der App                               |
+| `ADMIN_ALLOWED_IDENTIFIERS`  | Komma-separierte Liste erlaubter Admin-Konten      |
 
-MS_TENANT_ID=<azure-tenant-id>
-MS_CLIENT_ID=<azure-client-id>
-MS_CLIENT_SECRET=<azure-client-secret>
-MS_REDIRECT_URI=https://portal.febesol.com/auth/microsoft/callback
+## Troubleshooting
 
-MONDAY_API_TOKEN=<monday-api-token>
-```
+- **403/Redirect-Schleifen**: Sicherstellen, dass
+  `ADMIN_ALLOWED_IDENTIFIERS` den Microsoft-Account enthält bzw. dass lokale
+  Nutzer ein Konto besitzen.
+- **404 auf `/admin`**: Die Route existiert immer; ein fehlender Login zeigt den
+  Microsoft-Button. Prüfen Sie, ob das Frontend versehentlich eine andere Route
+  ansteuert.
+- **Session/Cookie-Probleme hinter Nginx**: In produktiven Setups `trust proxy`
+  aktiv lassen und sicherstellen, dass der Proxy `X-Forwarded-Proto` setzt.
+- **OIDC-Fehler nach Login**: Redirect-URI exakt mit Azure-Konfiguration
+  abgleichen (einschließlich Protokoll) und bei Bedarf neue Secrets generieren.
 
-## NSSM Deployment
+## Kurz-Testplan
 
-Für die Installation als Windows-Dienst mit NSSM bietet sich folgende
-Konfiguration an:
-
-```powershell
-nssm install FebesolPortal "C:\Program Files\nodejs\node.exe" "C:\portal\src\server.js"
-nssm set FebesolPortal AppDirectory "C:\portal"
-nssm set FebesolPortal AppStdout "C:\portal\portal.log"
-nssm set FebesolPortal AppStderr "C:\portal\portal.log"
-```
-
-Die Umgebung kann bei Bedarf über `nssm set FebesolPortal AppEnvironmentExtra
-"PORT=3004"` konfiguriert werden.
-
-## Datenhaltung
-
-- **Konten** werden in `data/accounts.json` als Array von Objekten gespeichert
-  (`email`, `passwordHash`, `contractorItemId`, `role`, `createdAt`). Passwörter
-  werden mit Argon2 gehasht.
-- **Aufträge** liegen in `data/orders.json` und enthalten Beispiel-Daten für die
-  Boards `1766160356` und `1766184997` (werden künftig durch Live-Daten aus der
-  Monday API ersetzt).
-
-## Weitere Schritte
-
-- Anbindung zusätzlicher Monday-Spalten (Status, Termine, Notizen) anstelle der
-  aktuellen Platzhalter.
-- Aufbau einer modernen Frontend-Oberfläche (z. B. React oder Server-Side
-  Rendering) inklusive Darstellung aller relevanten Datenpunkte.
+1. `GET /healthz` → `ok`.
+2. `GET /admin` (ohne Session) → Seite mit Button „Login mit Microsoft“.
+3. Button klicken → OIDC-Flow → nach Erfolg `/admin` erreichbar (Admin-Benutzer).
+4. `GET /` → lokale Login-Seite; `POST /login` prüft Argon2-Credentials.
+5. Nach lokalem Login → `/dashboard` erreichbar.
+6. >30 Minuten ohne Interaktion warten → Session erlischt, erneuter Login nötig.
+7. Buttons/Formulare klicken → Session verlängert sich (über `POST` oder
+   `POST /session/ping`).
