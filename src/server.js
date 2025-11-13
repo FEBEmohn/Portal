@@ -74,8 +74,8 @@ app.post('/session/ping', (req, res) => {
 app.use('/_static', express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
 app.use('/auth', authRouter);
-app.use('/', portalRouter);
 app.use('/admin', adminRouter);
+app.use('/', portalRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', {
