@@ -5,6 +5,9 @@
     <title><%= title %></title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
+      :root {
+        color-scheme: light dark;
+      }
       body {
         font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         display: grid;
@@ -12,36 +15,114 @@
         min-height: 100vh;
         margin: 0;
         background: #f3f4f6;
+        padding: 1.5rem;
       }
       main {
         background: #ffffff;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+        padding: 2.5rem 2rem;
+        border-radius: 16px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.12);
         text-align: center;
-        max-width: 360px;
+        width: min(420px, 100%);
+      }
+      h1 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.75rem;
+      }
+      p {
+        margin-top: 0.5rem;
+        margin-bottom: 1.5rem;
+        color: #475569;
+      }
+      .notice {
+        border-radius: 12px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1.25rem;
+        text-align: left;
+      }
+      .notice strong {
+        display: block;
+        margin-bottom: 0.25rem;
+      }
+      .notice--warn {
+        background: #fef3c7;
+        border: 1px solid #fcd34d;
+        color: #92400e;
+      }
+      .notice--error {
+        background: #fee2e2;
+        border: 1px solid #fca5a5;
+        color: #991b1b;
+      }
+      .action {
+        margin-top: 1.5rem;
       }
       button {
         background: #2563eb;
         color: #ffffff;
         border: none;
-        padding: 0.75rem 1.5rem;
+        padding: 0.85rem 1.75rem;
         border-radius: 999px;
-        font-size: 1rem;
+        font-size: 1.05rem;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
       }
       button:hover {
         background: #1d4ed8;
+      }
+      button[disabled] {
+        background: #cbd5f5;
+        color: #64748b;
+        cursor: not-allowed;
+      }
+      ul {
+        padding-left: 1.25rem;
+        margin: 0.5rem 0 0;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+          monospace;
+        font-size: 0.95rem;
       }
     </style>
   </head>
   <body>
     <main>
       <h1>Adminbereich</h1>
-      <p>Bitte melden Sie sich mit Microsoft an, um den Adminbereich zu öffnen.</p>
-      <a href="/auth/microsoft">
-        <button type="button">Login mit Microsoft</button>
-      </a>
+      <% if (!oidcReady) { %>
+      <div class="notice notice--warn">
+        <strong>Konfiguration erforderlich</strong>
+        <p>
+          Die Microsoft-Anmeldung ist noch nicht vollständig eingerichtet. Bitte setzen Sie die folgenden
+          Umgebungsvariablen:
+        </p>
+        <ul>
+          <% missingSettings.forEach(function (name) { %>
+          <li><code><%= name %></code></li>
+          <% }) %>
+        </ul>
+      </div>
+      <% } %>
+
+      <% if (errorMessage) { %>
+      <div class="notice notice--error"><%= errorMessage %></div>
+      <% } else if (infoMessage) { %>
+      <p><%= infoMessage %></p>
+      <% } %>
+
+      <div class="action">
+        <% if (oidcReady) { %>
+        <form action="/auth/microsoft" method="get">
+          <button type="submit">Login mit Microsoft</button>
+        </form>
+        <% } else { %>
+        <button type="button" disabled>Login mit Microsoft</button>
+        <% } %>
+      </div>
     </main>
   </body>
 </html>
