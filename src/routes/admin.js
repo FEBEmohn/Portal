@@ -11,10 +11,6 @@ router.get('/', (req, res) => {
   const hasAdminSession = req.session?.authType === 'oidc';
   const isAuthorizedAdmin = hasAdminSession && isAdminUser(sessionUser);
 
-  if (isAuthorizedAdmin) {
-    return res.redirect('/admin/start');
-  }
-
   if (!hasAdminSession) {
     return renderAdminLogin(res);
   }
@@ -30,7 +26,7 @@ router.get('/', (req, res) => {
 router.get('/start', requireAdmin, (req, res) => {
   return res.render('admin-dashboard', {
     title: 'Adminbereich',
-    user: req.session.user,
+    user: sessionUser,
   });
 });
 
