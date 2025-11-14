@@ -22,6 +22,8 @@ const session = require('express-session');
 const helmet = require('helmet');
 const cookieParser = require('cookie-parser');
 
+loadEnv();
+
 const { activityGuard, resetIdleOnAction } = require('./middleware/auth');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
@@ -136,3 +138,48 @@ function firstPublicIPv4() {
 }
 
 module.exports = app;
+
+function loadEnv() {
+  try {
+    require('dotenv').config();
+  } catch (error) {
+    if (error.code === 'MODULE_NOT_FOUND') {
+      loadEnvFallback();
+      return;
+    }
+    throw error;
+  }
+}
+
+function loadEnvFallback() {
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (!fs.existsSync(envPath)) {
+    return;
+  }
+
+  const content = fs.readFileSync(envPath, 'utf8');
+  content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith('#'))
+    .forEach((line) => {
+      const equalsIndex = line.indexOf('=');
+      if (equalsIndex === -1) {
+        return;
+      }
+
+      const key = line.slice(0, equalsIndex).trim();
+      let value = line.slice(equalsIndex + 1).trim();
+
+      if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'"))
+      ) {
+        value = value.slice(1, -1);
+      }
+
+      if (key && process.env[key] === undefined) {
+        process.env[key] = value;
+      }
+    });
+}

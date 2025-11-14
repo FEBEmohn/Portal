@@ -1,45 +1,14 @@
 const express = require('express');
-const crypto = require('crypto');
-const { Issuer } = require('openid-client');
-
 const { isAdminUser } = require('../middleware/auth');
 const {
   requireOidcSettings,
   OidcConfigurationError,
 } = require('../lib/oidc-settings');
+const { getClient } = require('../lib/oidc-client');
 const { renderAdminLogin } = require('../lib/admin-view');
+const { buildAuthorizationUrl } = require('../lib/oidc-login');
 
 const router = express.Router();
-
-let clientPromise;
-let cachedSettingsKey;
-
-function buildSettingsKey(settings) {
-  return [settings.issuer, settings.clientId, settings.redirectUri].join('|');
-}
-
-async function getClient(settings) {
-  const key = buildSettingsKey(settings);
-  if (!clientPromise || cachedSettingsKey !== key) {
-    clientPromise = Issuer.discover(settings.issuer)
-      .then(
-        (issuer) =>
-          new issuer.Client({
-            client_id: settings.clientId,
-            client_secret: settings.clientSecret,
-            redirect_uris: [settings.redirectUri],
-            response_types: ['code'],
-          })
-      )
-      .catch((error) => {
-        clientPromise = null;
-        cachedSettingsKey = null;
-        throw error;
-      });
-    cachedSettingsKey = key;
-  }
-  return clientPromise;
-}
 
 function clearOidcTransaction(req) {
   if (req.session) {
@@ -50,27 +19,12 @@ function clearOidcTransaction(req) {
 
 router.get('/microsoft', async (req, res, next) => {
   try {
-    const settings = requireOidcSettings();
-    const client = await getClient(settings);
-    const state = crypto.randomBytes(16).toString('hex');
-    const nonce = crypto.randomBytes(16).toString('hex');
-
-    req.session.oidcState = state;
-    req.session.oidcNonce = nonce;
+    const { authorizationUrl } = await buildAuthorizationUrl(req);
 
     req.session.save((error) => {
       if (error) {
         return next(error);
       }
-
-      const authorizationUrl = client.authorizationUrl({
-        scope: 'openid profile email',
-        state,
-        nonce,
-        redirect_uri: settings.redirectUri,
-        prompt: 'select_account',
-      });
-
       res.redirect(authorizationUrl);
     });
   } catch (error) {
@@ -95,7 +49,7 @@ router.get('/microsoft/callback', async (req, res, next) => {
 
     if (!expectedState || !expectedNonce) {
       clearOidcTransaction(req);
-      return renderAdminLogin(res, {
+      return renderLoginWithFreshLink(req, res, {
         status: 400,
         errorMessage:
           'Die Anmeldesitzung ist abgelaufen. Bitte starten Sie den Login erneut.',
@@ -110,7 +64,7 @@ router.get('/microsoft/callback', async (req, res, next) => {
 
     if (!isAdminUser(claims)) {
       clearOidcTransaction(req);
-      return renderAdminLogin(res, {
+      return renderLoginWithFreshLink(req, res, {
         status: 403,
         errorMessage:
           'Ihr Microsoft-Konto ist nicht für den Adminbereich freigeschaltet.',
@@ -152,7 +106,7 @@ router.get('/microsoft/callback', async (req, res, next) => {
     }
 
     if (error && error.name === 'RPError') {
-      return renderAdminLogin(res, {
+      return renderLoginWithFreshLink(req, res, {
         status: 401,
         errorMessage:
           'Die Anmeldung konnte nicht abgeschlossen werden. Bitte versuchen Sie es erneut.',
@@ -175,3 +129,15 @@ router.post('/logout', (req, res, next) => {
 });
 
 module.exports = router;
+
+async function renderLoginWithFreshLink(req, res, options) {
+  try {
+    const { authorizationUrl } = await buildAuthorizationUrl(req);
+    return renderAdminLogin(res, { ...options, authorizationUrl });
+  } catch (error) {
+    if (error instanceof OidcConfigurationError) {
+      return renderAdminLogin(res, options);
+    }
+    throw error;
+  }
+}

@@ -1,6 +1,9 @@
 const { readOidcSettings } = require('./oidc-settings');
 
-function renderAdminLogin(res, { status, errorMessage, infoMessage } = {}) {
+function renderAdminLogin(
+  res,
+  { status, errorMessage, infoMessage, authorizationUrl } = {}
+) {
   const { missing } = readOidcSettings();
   const oidcReady = missing.length === 0;
   const baseStatus = typeof status === 'number' ? status : oidcReady ? 200 : 503;
@@ -11,6 +14,7 @@ function renderAdminLogin(res, { status, errorMessage, infoMessage } = {}) {
     oidcReady,
     missingSettings: missing,
     errorMessage: errorMessage || null,
+    authorizationUrl: authorizationUrl || null,
     infoMessage:
       infoMessage ||
       (oidcReady
