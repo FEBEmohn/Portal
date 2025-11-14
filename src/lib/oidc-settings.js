@@ -1,8 +1,6 @@
 const REQUIRED_ENV = {
-  issuer: 'OIDC_ISSUER',
   clientId: 'OIDC_CLIENT_ID',
   clientSecret: 'OIDC_CLIENT_SECRET',
-  redirectUri: 'OIDC_REDIRECT_URI',
 };
 
 class OidcConfigurationError extends Error {
@@ -24,16 +22,28 @@ function trimOrNull(value) {
 }
 
 function readOidcSettings() {
+  const explicitIssuer = trimOrNull(process.env.OIDC_ISSUER);
+  const tenantId = trimOrNull(process.env.OIDC_TENANT_ID);
+  const issuer = explicitIssuer || (tenantId ? `https://login.microsoftonline.com/${tenantId}/v2.0` : null);
+
   const settings = {
-    issuer: trimOrNull(process.env.OIDC_ISSUER),
+    issuer,
     clientId: trimOrNull(process.env.OIDC_CLIENT_ID),
     clientSecret: trimOrNull(process.env.OIDC_CLIENT_SECRET),
     redirectUri: trimOrNull(process.env.OIDC_REDIRECT_URI),
   };
 
-  const missing = Object.entries(settings)
-    .filter(([, value]) => !value)
-    .map(([key]) => REQUIRED_ENV[key]);
+  const missing = [];
+  if (!settings.clientId) {
+    missing.push(REQUIRED_ENV.clientId);
+  }
+  if (!settings.clientSecret) {
+    missing.push(REQUIRED_ENV.clientSecret);
+  }
+
+  if (!settings.issuer) {
+    missing.push('OIDC_ISSUER or OIDC_TENANT_ID');
+  }
 
   return { settings, missing };
 }

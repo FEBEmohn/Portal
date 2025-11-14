@@ -18,8 +18,6 @@ try {
   }
 }
 
-const path = require('path');
-const os = require('os');
 const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
@@ -59,7 +57,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).type('text/plain').send('ok');
 });
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
 
