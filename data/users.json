@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "id": "test-user",
+      "email": "test@partner.de",
+      "name": "Test",
+      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$0kxFOLRS4VcbS0IyfSlupg$8KSThs40GSRxMZ5dO0ILZbbmFx78xuPev6cyyw9OrzY"
+    }
+  ]
+}

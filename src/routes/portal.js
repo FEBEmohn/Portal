@@ -6,9 +6,13 @@ const users = require('../services/users');
 
 const router = express.Router();
 
-router.get('/', (req, res) => {
+router.get('/', (_req, res) => {
+  return res.redirect('/login');
+});
+
+router.get('/login', (req, res) => {
   if (req.session?.authType === 'local' && req.session.user) {
-    return res.redirect('/dashboard');
+    return res.redirect('/start');
   }
 
   return res.render('local-login', {
@@ -61,7 +65,7 @@ router.post('/login', async (req, res, next) => {
         if (saveError) {
           return next(saveError);
         }
-        res.redirect('/dashboard');
+        res.redirect('/start');
       });
     });
   } catch (error) {
@@ -69,9 +73,9 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-router.get('/dashboard', requireLocalAuth, (req, res) => {
-  res.render('dashboard', {
-    title: 'Partner-Dashboard',
+router.get('/start', requireLocalAuth, (req, res) => {
+  res.render('partner-start', {
+    title: 'Partner-Start',
     user: req.session.user,
   });
 });
@@ -82,7 +86,7 @@ router.post('/logout', (req, res, next) => {
       return next(error);
     }
     res.clearCookie('portal.sid');
-    res.redirect('/');
+    res.redirect('/login');
   });
 });
 
