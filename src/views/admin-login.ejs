@@ -5,43 +5,184 @@
     <title><%= title %></title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <style>
+      :root {
+        color-scheme: light;
+        font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        display: grid;
-        place-items: center;
         min-height: 100vh;
         margin: 0;
-        background: #f3f4f6;
+        background: radial-gradient(circle at top, #dbeafe, #f8fafc 55%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: #0f172a;
       }
       main {
+        width: min(460px, 100%);
         background: #ffffff;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
-        text-align: center;
-        max-width: 360px;
+        border-radius: 28px;
+        padding: 2.75rem 2.5rem;
+        box-shadow: 0 35px 70px rgba(15, 23, 42, 0.12);
+      }
+      .brand {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1.75rem;
+      }
+      .badge {
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #1d4ed8;
+        font-weight: 600;
+      }
+      h1 {
+        margin: 0;
+        font-size: 2rem;
+      }
+      .subtitle {
+        margin: 0;
+        color: #475569;
+      }
+      .notice {
+        border-radius: 16px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid transparent;
+        font-size: 0.95rem;
+      }
+      .notice strong {
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+      .notice--info {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #1e3a8a;
+      }
+      .notice--warn {
+        background: #fef9c3;
+        border-color: #fde047;
+        color: #854d0e;
+      }
+      .notice--error {
+        background: #fee2e2;
+        border-color: #fecaca;
+        color: #991b1b;
+      }
+      ul {
+        margin: 0.75rem 0 0;
+        padding-left: 1.25rem;
+      }
+      code {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+        font-size: 0.9rem;
+        color: #082f49;
+      }
+      .cta {
+        margin-top: 2rem;
+      }
+      form {
+        margin: 0;
       }
       button {
-        background: #2563eb;
-        color: #ffffff;
+        width: 100%;
         border: none;
-        padding: 0.75rem 1.5rem;
         border-radius: 999px;
-        font-size: 1rem;
+        padding: 0.95rem 1.5rem;
+        font-size: 1.05rem;
+        font-weight: 600;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.65rem;
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        color: #ffffff;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 15px 35px rgba(37, 99, 235, 0.35);
       }
-      button:hover {
-        background: #1d4ed8;
+      button:hover,
+      button:focus-visible {
+        transform: translateY(-1px);
+        box-shadow: 0 20px 40px rgba(37, 99, 235, 0.4);
+        outline: none;
+      }
+      button svg {
+        width: 20px;
+        height: 20px;
+      }
+      .helper-text {
+        margin-top: 0.75rem;
+        font-size: 0.9rem;
+        color: #475569;
+        text-align: center;
+      }
+      .helper-text strong {
+        font-weight: 600;
+        color: #0f172a;
+      }
+      @media (max-width: 520px) {
+        body {
+          padding: 1.25rem;
+        }
+        main {
+          padding: 2rem 1.75rem;
+        }
       }
     </style>
   </head>
   <body>
     <main>
-      <h1>Adminbereich</h1>
-      <p>Bitte melden Sie sich mit Microsoft an, um den Adminbereich zu öffnen.</p>
-      <a href="/auth/microsoft">
-        <button type="button">Login mit Microsoft</button>
-      </a>
+      <div class="brand">
+        <span class="badge">Febesol Portal</span>
+        <h1>Adminbereich</h1>
+        <p class="subtitle">Melden Sie sich mit Ihrem Microsoft-Konto an, um den Administrationsbereich zu öffnen.</p>
+      </div>
+
+      <% if (errorMessage) { %>
+      <div class="notice notice--error"><%= errorMessage %></div>
+      <% } else if (infoMessage) { %>
+      <div class="notice notice--info"><%= infoMessage %></div>
+      <% } %>
+
+      <% if (!oidcReady) { %>
+      <div class="notice notice--warn">
+        <strong>Konfiguration erforderlich</strong>
+        <p>Die Microsoft-Anmeldung ist noch nicht vollständig eingerichtet. Bitte setzen Sie die folgenden Umgebungsvariablen:</p>
+        <ul>
+          <% missingSettings.forEach(function (name) { %>
+          <li><code><%= name %></code></li>
+          <% }) %>
+        </ul>
+      </div>
+      <% } %>
+
+      <div class="cta">
+        <form action="/auth/microsoft" method="get">
+          <button type="submit" aria-disabled="<%= !oidcReady %>">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <rect x="2" y="2" width="9.5" height="9.5" fill="#f1511b" />
+              <rect x="12.5" y="2" width="9.5" height="9.5" fill="#80cc28" />
+              <rect x="2" y="12.5" width="9.5" height="9.5" fill="#00adef" />
+              <rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#fbbc09" />
+            </svg>
+            Login mit Microsoft
+          </button>
+        </form>
+        <% if (!oidcReady) { %>
+        <p class="helper-text">
+          <strong>Hinweis:</strong> Der Login ist sichtbar freigeschaltet, schlägt jedoch fehl, solange die Konfiguration unvollständig
+          ist.
+        </p>
+        <% } %>
+      </div>
     </main>
   </body>
 </html>

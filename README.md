@@ -4,7 +4,7 @@ Das Projekt stellt einen Express-Server bereit, der zwei getrennte
 Authentifizierungswege kombiniert:
 
 - **Microsoft OIDC Login** für Administrator:innen unter `/admin`.
-- **Lokaler Login** (E-Mail & Passwort) für Partner:innen unter `/`.
+- **Lokaler Login** (E-Mail & Passwort) für Partner:innen unter `/login`.
 
 Eine Sitzung entsteht erst nach einem erfolgreichen Login. Anschließend gilt
 ein Idle-Timeout von 30 Minuten, das ausschließlich durch POST-Interaktionen
@@ -46,8 +46,9 @@ ausgegeben wird.
 
 - Lokale Accounts werden in `data/users.json` hinterlegt. Passwörter sind mit
   `argon2` gehasht.
-- Unauthentifizierte Aufrufe von `/` liefern immer das Login-Formular.
-- Nach erfolgreichem Login gelangen Partner:innen auf das Dashboard (`/dashboard`).
+- Unauthentifizierte Aufrufe von `/login` liefern immer das Login-Formular.
+- Nach erfolgreichem Login gelangen Partner:innen auf die Startseite (`/start`).
+- Ein Demo-Account ist bereits hinterlegt: `test@partner.de` / `Mustermann`.
 
 ## Sessions & Idle-Timeout
 
@@ -77,6 +78,6 @@ ausgegeben wird.
 2. `GET /admin` ohne Session → Login-Seite mit „Login mit Microsoft“.
 3. Erfolgreicher Microsoft-Login → Admin-Dashboard erreichbar, weitere Unterseiten
    wie `/admin/users` verlangen eine Admin-Session.
-4. `GET /` → lokales Loginformular, kein 403.
-5. Lokaler Login → `/dashboard` erreichbar, Logout zerstört die Session.
+4. `GET /login` → lokales Loginformular, kein 403.
+5. Lokaler Login → `/start` erreichbar, Logout zerstört die Session.
 6. Nach >30 Minuten ohne Interaktion → Session ungültig, erneuter Login erforderlich.
