@@ -22,7 +22,14 @@ function isAdminUser(user) {
   const identifiers = [user.email, user.upn, user.oid, user.sub]
     .filter(Boolean)
     .map((entry) => String(entry).toLowerCase());
-  return identifiers.some((value) => allowed.includes(value));
+  return identifiers.some((value) =>
+    allowed.some((entry) => {
+      if (entry.startsWith('@')) {
+        return value.endsWith(entry);
+      }
+      return value === entry;
+    })
+  );
 }
 
 function activityGuard(req, res, next) {

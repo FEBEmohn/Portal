@@ -6,7 +6,7 @@ const {
 } = require('../lib/oidc-settings');
 const { getClient } = require('../lib/oidc-client');
 const { renderAdminLogin } = require('../lib/admin-view');
-const { buildAuthorizationUrl } = require('../lib/oidc-login');
+const { buildAuthorizationUrl, resolveRedirectUri } = require('../lib/oidc-login');
 
 const router = express.Router();
 
@@ -39,24 +39,25 @@ router.get('/microsoft', async (req, res, next) => {
   }
 });
 
-router.get('/microsoft/callback', async (req, res, next) => {
+router.all('/microsoft/callback', async (req, res, next) => {
   try {
     const settings = requireOidcSettings();
     const client = await getClient(settings);
-    const params = client.callbackParams(req);
+    const params = req.method === 'POST' ? req.body : req.query;
     const expectedState = req.session?.oidcState;
     const expectedNonce = req.session?.oidcNonce;
 
     if (!expectedState || !expectedNonce) {
       clearOidcTransaction(req);
       return renderLoginWithFreshLink(req, res, {
-        status: 400,
+        status: 440,
         errorMessage:
           'Die Anmeldesitzung ist abgelaufen. Bitte starten Sie den Login erneut.',
       });
     }
 
-    const tokenSet = await client.callback(settings.redirectUri, params, {
+    const redirectUri = resolveRedirectUri(req);
+    const tokenSet = await client.callback(redirectUri, params, {
       state: expectedState,
       nonce: expectedNonce,
     });
@@ -81,9 +82,10 @@ router.get('/microsoft/callback', async (req, res, next) => {
       req.session.user = {
         sub: claims.sub,
         email: claims.email || claims.preferred_username,
-        name: claims.name,
+        name: claims.name || claims.given_name || '',
         upn: claims.preferred_username,
-        oid: claims.oid,
+        oid: claims.oid || claims.sub,
+        raw: claims,
       };
       req.session.authType = 'oidc';
       req.session.lastActivity = Date.now();
@@ -118,13 +120,13 @@ router.get('/microsoft/callback', async (req, res, next) => {
 });
 
 router.post('/logout', (req, res, next) => {
-  const redirectTarget = req.session?.authType === 'oidc' ? '/admin' : '/login';
+  const wasAdminSession = req.session?.authType === 'oidc';
   req.session.destroy((error) => {
     if (error) {
       return next(error);
     }
     res.clearCookie('portal.sid');
-    res.redirect(redirectTarget);
+    res.redirect(wasAdminSession ? '/admin' : '/');
   });
 });
 

@@ -9,39 +9,29 @@ const { buildAuthorizationUrl } = require('../lib/oidc-login');
 const router = express.Router();
 
 router.get('/', async (req, res, next) => {
-  const sessionUser = req.session?.user || null;
   const hasAdminSession = req.session?.authType === 'oidc';
+  const sessionUser = hasAdminSession ? req.session?.user : null;
   const isAuthorizedAdmin = hasAdminSession && isAdminUser(sessionUser);
 
-  if (!hasAdminSession) {
-    try {
-      const { authorizationUrl } = await buildAuthorizationUrl(req);
-      return renderAdminLogin(res, { authorizationUrl });
-    } catch (error) {
-      if (error instanceof OidcConfigurationError) {
-        return renderAdminLogin(res);
-      }
-      return next(error);
-    }
+  if (isAuthorizedAdmin) {
+    return res.redirect('/admin/start');
   }
 
-  if (!isAuthorizedAdmin) {
-    try {
-      const { authorizationUrl } = await buildAuthorizationUrl(req);
-      return renderAdminLogin(res, {
+  const errorOptions = hasAdminSession
+    ? {
         status: 403,
         errorMessage: 'Ihr Konto ist nicht für den Adminbereich freigeschaltet.',
-        authorizationUrl,
-      });
-    } catch (error) {
-      if (error instanceof OidcConfigurationError) {
-        return renderAdminLogin(res, {
-          status: 403,
-          errorMessage: 'Ihr Konto ist nicht für den Adminbereich freigeschaltet.',
-        });
       }
-      return next(error);
+    : {};
+
+  try {
+    const { authorizationUrl } = await buildAuthorizationUrl(req);
+    return renderAdminLogin(res, { ...errorOptions, authorizationUrl });
+  } catch (error) {
+    if (error instanceof OidcConfigurationError) {
+      return renderAdminLogin(res, errorOptions);
     }
+    return next(error);
   }
 });
 

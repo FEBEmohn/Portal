@@ -18,8 +18,6 @@ try {
   }
 }
 
-const path = require('path');
-const os = require('os');
 const crypto = require('crypto');
 const express = require('express');
 const session = require('express-session');
@@ -59,7 +57,7 @@ app.get('/healthz', (_req, res) => {
   res.status(200).type('text/plain').send('ok');
 });
 
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -67,6 +65,8 @@ const sessionSecret = process.env.SESSION_SECRET || crypto.randomBytes(32).toStr
 if (!process.env.SESSION_SECRET) {
   console.warn('[session] SESSION_SECRET fehlt – es wird ein ephemeres Secret verwendet.');
 }
+
+const sessionSameSite = isProduction ? 'none' : 'lax';
 
 app.use(
   session({
@@ -76,7 +76,7 @@ app.use(
     saveUninitialized: false,
     rolling: false,
     cookie: {
-      sameSite: 'lax',
+      sameSite: sessionSameSite,
       httpOnly: true,
       secure: isProduction,
     },
