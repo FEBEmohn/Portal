@@ -66,6 +66,8 @@ if (!process.env.SESSION_SECRET) {
   console.warn('[session] SESSION_SECRET fehlt – es wird ein ephemeres Secret verwendet.');
 }
 
+const sessionSameSite = isProduction ? 'none' : 'lax';
+
 app.use(
   session({
     name: 'portal.sid',
@@ -74,7 +76,7 @@ app.use(
     saveUninitialized: false,
     rolling: false,
     cookie: {
-      sameSite: 'lax',
+      sameSite: sessionSameSite,
       httpOnly: true,
       secure: isProduction,
     },
