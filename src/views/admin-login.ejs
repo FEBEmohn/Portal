@@ -122,8 +122,8 @@
       <% } %>
 
       <div class="action">
-        <% if (authorizationUrl) { %>
-        <a class="action-control" href="<%= authorizationUrl %>" role="button">Login mit Microsoft</a>
+        <% if (oidcReady) { %>
+        <a class="action-control" href="/auth/microsoft" role="button">Login mit Microsoft</a>
         <% } else { %>
         <span class="action-control is-disabled">Login mit Microsoft</span>
         <% } %>
