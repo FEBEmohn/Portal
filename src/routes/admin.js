@@ -21,7 +21,9 @@ router.get('/', (req, res) => {
       errorMessage: 'Ihr Konto ist nicht für den Adminbereich freigeschaltet.',
     });
   }
+});
 
+router.get('/start', requireAdmin, (req, res) => {
   return res.render('admin-dashboard', {
     title: 'Adminbereich',
     user: sessionUser,

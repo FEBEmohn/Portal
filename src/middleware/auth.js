@@ -38,7 +38,7 @@ function activityGuard(req, res, next) {
       if (req.originalUrl.startsWith('/admin')) {
         return res.redirect('/admin');
       }
-      return res.redirect('/');
+      return res.redirect('/login');
     });
     return;
   }
@@ -54,7 +54,7 @@ function resetIdleOnAction(req) {
 
 function requireLocalAuth(req, res, next) {
   if (!sessionHasUser(req) || req.session.authType !== 'local') {
-    return res.redirect('/');
+    return res.redirect('/login');
   }
   return activityGuard(req, res, next);
 }

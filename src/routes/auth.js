@@ -139,7 +139,7 @@ router.get('/microsoft/callback', async (req, res, next) => {
         if (saveError) {
           return next(saveError);
         }
-        res.redirect('/admin');
+        res.redirect('/admin/start');
       });
     });
   } catch (error) {
@@ -164,7 +164,7 @@ router.get('/microsoft/callback', async (req, res, next) => {
 });
 
 router.post('/logout', (req, res, next) => {
-  const redirectTarget = req.session?.authType === 'oidc' ? '/admin' : '/';
+  const redirectTarget = req.session?.authType === 'oidc' ? '/admin' : '/login';
   req.session.destroy((error) => {
     if (error) {
       return next(error);
