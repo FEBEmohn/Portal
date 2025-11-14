@@ -27,6 +27,16 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+// Einige Plesk/IIS-Setups setzen statt "X-Forwarded-Proto" nur "X-ARR-SSL".
+// Damit Express die eingehenden HTTPS-Aufrufe erkennt (wichtig für Secure Cookies),
+// heben wir dieses Signal auf die übliche Header-Ebene.
+app.use((req, _res, next) => {
+  if (req.headers['x-arr-ssl']) {
+    req.headers['x-forwarded-proto'] = 'https';
+  }
+  next();
+});
+
 app.use(helmet());
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -74,8 +84,8 @@ app.post('/session/ping', (req, res) => {
 app.use('/_static', express.static(path.join(__dirname, '..', 'public'), { index: false }));
 
 app.use('/auth', authRouter);
-app.use('/', portalRouter);
 app.use('/admin', adminRouter);
+app.use('/', portalRouter);
 
 app.use((req, res) => {
   res.status(404).render('404', {
