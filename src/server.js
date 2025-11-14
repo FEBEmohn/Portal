@@ -6,6 +6,8 @@ try {
   }
 }
 
+require('dotenv').config();
+
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
