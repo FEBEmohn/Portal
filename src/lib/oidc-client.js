@@ -11,15 +11,20 @@ async function getClient(settings) {
   const key = buildSettingsKey(settings);
   if (!clientPromise || cachedSettingsKey !== key) {
     clientPromise = Issuer.discover(settings.issuer)
-      .then(
-        (issuer) =>
-          new issuer.Client({
-            client_id: settings.clientId,
-            client_secret: settings.clientSecret,
-            redirect_uris: [settings.redirectUri],
-            response_types: ['code'],
-          })
-      )
+      .then((issuer) => {
+        const metadata = {
+          client_id: settings.clientId,
+          client_secret: settings.clientSecret,
+          token_endpoint_auth_method: 'client_secret_post',
+          response_types: ['code'],
+        };
+
+        if (settings.redirectUri) {
+          metadata.redirect_uris = [settings.redirectUri];
+        }
+
+        return new issuer.Client(metadata);
+      })
       .catch((error) => {
         clientPromise = null;
         cachedSettingsKey = null;
