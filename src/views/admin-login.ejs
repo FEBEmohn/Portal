@@ -56,7 +56,7 @@
       .action {
         margin-top: 1.5rem;
       }
-      button {
+      .action-control {
         width: 100%;
         border: none;
         padding: 0.85rem 1.75rem;
@@ -67,6 +67,10 @@
         align-items: center;
         justify-content: center;
         gap: 0.5rem;
+        text-decoration: none;
+        background: #2563eb;
+        color: #ffffff;
+        font-weight: 600;
       }
       @media (max-width: 520px) {
         body {
@@ -76,7 +80,8 @@
           padding: 2rem 1.75rem;
         }
       }
-      button[disabled] {
+      .action-control[disabled],
+      .action-control.is-disabled {
         background: #cbd5f5;
         color: #64748b;
         cursor: not-allowed;
@@ -117,12 +122,10 @@
       <% } %>
 
       <div class="action">
-        <% if (oidcReady) { %>
-        <form action="/auth/microsoft" method="get">
-          <button type="submit">Login mit Microsoft</button>
-        </form>
+        <% if (authorizationUrl) { %>
+        <a class="action-control" href="<%= authorizationUrl %>" role="button">Login mit Microsoft</a>
         <% } else { %>
-        <button type="button" disabled>Login mit Microsoft</button>
+        <span class="action-control is-disabled">Login mit Microsoft</span>
         <% } %>
       </div>
     </main>
